@@ -6,7 +6,7 @@ from django.core.paginator import Paginator
 from django.db.models import Q
 from django.http import Http404
 from django.shortcuts import redirect, render
-from django.views.generic import ListView
+from django.views.generic import DetailView, ListView
 
 PER_PAGE = 9
 
@@ -144,6 +144,24 @@ class SearchListView(PostListView):
             return redirect('blog:index')
         return super().get(request, *args, **kwargs)
 
+
+class PageDetailView(DetailView):
+    model = Page
+    template_name = 'blog/pages/page.html'
+    slug_field = 'slug'
+    context_object_name = 'page'
+
+    def get_context_data(self, **kwargs: Any):
+        ctx = super().get_context_data(**kwargs)
+        page = self.get_object()
+        page_title = f'{page.title} - Página - '  # type: ignore
+        ctx.update({
+            'page_title': page_title,
+        })
+        return ctx
+
+    def get_queryset(self):
+        return super().get_queryset().filter(is_published=True)
 
 def page(request, slug):
 
