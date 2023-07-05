@@ -1,3 +1,5 @@
+from typing import Any
+
 from blog.models import Page, Post
 from django.contrib.auth.models import User
 from django.core.paginator import Paginator
@@ -30,34 +32,46 @@ class PostListView(ListView):
         })
 
         return context
-
-def created_by(request, author_pk):
-    user = User.objects.filter(pk=author_pk).first()
     
-    if user is None:
-        raise Http404()
+class CreatedByListView(PostListView):
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self._temp_context: dict[str, Any] = {}
 
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        user = self._temp_context['user']
+        user_full_name = user.username
 
-    posts = Post.objects.get_published()\
-        .filter(created_by__pk=author_pk)
+        if user.first_name:
+            user_full_name = f'{user.first_name} {user.last_name}'
+        page_title = 'Posts de ' + user_full_name + ' - '
 
-    paginator = Paginator(posts, PER_PAGE)
-    page_number = request.GET.get("page")
-    page_obj = paginator.get_page(page_number)
-
-
-    if user.first_name:
-        user_full_name = f'{user.first_name} {user.last_name}'
-    page_title = 'Posts de ' + user_full_name + ' - '    
-
-    return render(
-        request,
-        'blog/pages/index.html',
-        {
-            'page_obj': page_obj,
+        ctx.update({
             'page_title': page_title,
-        }
-    )
+        })
+
+        return ctx
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        qs = qs.filter(created_by__pk=self._temp_context['user'].pk)
+        return qs
+
+    def get(self, request, *args, **kwargs):
+        author_pk = self.kwargs.get('author_pk')
+        user = User.objects.filter(pk=author_pk).first()
+
+        if user is None:
+            raise Http404()
+
+        self._temp_context.update({
+            'author_pk': author_pk,
+            'user': user,
+        })
+
+        return super().get(request, *args, **kwargs)
+
 
 
 def category(request, slug):
